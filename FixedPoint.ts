@@ -14,7 +14,7 @@ export class FixedPoint {
 	}
 
 	static fromNumber(n: number): FixedPoint {
-		return new FixedPoint((n << FixedPoint.scaleShift) | 0);
+		return new FixedPoint((n * ( 1 << FixedPoint.scaleShift)) | 0);
 	}
 
 	static toNumber(a: FixedPoint): number {
