@@ -1,5 +1,7 @@
 export class FixedPoint {
 	// This class represents a Q15.16 fixed point number
+	// We implement 4 basic operations: +, -, *, /...
+	// ...without checking for over/under-flow
 	
 	// the scaling factor is 1/(2^16) or 2^-16
 	static scaleShift = 16;
@@ -27,6 +29,19 @@ export class FixedPoint {
 
 	static sub(a: FixedPoint, b: FixedPoint): FixedPoint {
 		return new FixedPoint(((a.rawValue|0) - (b.rawValue|0))|0);
+	}
+
+	static mul(a: FixedPoint, b: FixedPoint): FixedPoint {
+		let aHi: number = a.rawValue >> FixedPoint.scaleShift;
+		let aLo: number = a.rawValue & 0x0000FFFF;
+		let bHi: number = b.rawValue >> FixedPoint.scaleShift;
+		let bLo: number = b.rawValue & 0x0000FFFF;
+		return new FixedPoint((
+			((Math.imul(aLo, bLo)) >> FixedPoint.scaleShift) +
+			(Math.imul(aLo, bHi) | 0) +
+			(Math.imul(bLo, aHi) | 0) +
+			((Math.imul(aHi, bHi)) << FixedPoint.scaleShift)
+		) | 0);
 	}
 
 
