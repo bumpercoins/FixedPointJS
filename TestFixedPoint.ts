@@ -2,16 +2,16 @@ import { FixedPoint } from "./FixedPoint";
 
 // This creates a tester function that lets us test a FixedPoint operation on a list of pairs of operands
 // See the testOperation function below
-let createTestOperation = function(fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number): (operandPairs: [number, number][]) => void {
+let createTestOperation = function(fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number, debug: boolean = false): (operandPairs: [number, number][]) => void {
 	return function(operandPairs: [number, number][]) {
-		testOperation(operandPairs, fixedPointFn, fn);
+		testOperation(operandPairs, fixedPointFn, fn, debug);
 	}
 }
 
 // This is the heart of our testing.
 // We take in a list of pairs of number operands, and 2 flavors of an operation to test: the default operation and our FixedPoint emulation of the operation
 // For each pair of operands we apply both the regular and fixed point versions to the operands and compare the results.
-let testOperation = function(operandPairs: [number, number][], fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number) {
+let testOperation = function(operandPairs: [number, number][], fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number, debug: boolean = false) {
 	for(let operandPair of operandPairs) {
 		let op1: number = operandPair[0];
 		let op2: number = operandPair[1];
@@ -52,4 +52,4 @@ testSub([[a, b], [134,-123], [23423.5446, -3545.345]]);
 
 // test mul
 let testMul: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.mul, (a, b) => a * b);
-testMul([[a, b]]);
+testMul([[a, b], [a, -b], [-1 * a, b], [-23.424, 2345], [23.424, 2345]]);
