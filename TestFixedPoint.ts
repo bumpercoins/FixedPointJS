@@ -2,16 +2,16 @@ import { FixedPoint } from "./FixedPoint";
 
 // This creates a tester function that lets us test a FixedPoint operation on a list of pairs of operands
 // See the testOperation function below
-let createTestOperation = function(fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number, debug: boolean = false): (operandPairs: [number, number][]) => void {
+let createTestOperation = function(fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number, debug: boolean = false, maxError: number = 0.0001): (operandPairs: [number, number][]) => void {
 	return function(operandPairs: [number, number][]) {
-		testOperation(operandPairs, fixedPointFn, fn, debug);
+		testOperation(operandPairs, fixedPointFn, fn, debug, maxError);
 	}
 }
 
 // This is the heart of our testing.
 // We take in a list of pairs of number operands, and 2 flavors of an operation to test: the default operation and our FixedPoint emulation of the operation
 // For each pair of operands we apply both the regular and fixed point versions to the operands and compare the results.
-let testOperation = function(operandPairs: [number, number][], fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number, debug: boolean = false) {
+let testOperation = function(operandPairs: [number, number][], fixedPointFn: (a: FixedPoint, b: FixedPoint) => FixedPoint, fn: (a: number, b: number) => number, debug: boolean = false, maxError: number) {
 	for(let operandPair of operandPairs) {
 		let op1: number = operandPair[0];
 		let op2: number = operandPair[1];
@@ -24,12 +24,12 @@ let testOperation = function(operandPairs: [number, number][], fixedPointFn: (a:
 		let expectedResult: number = fn(op1, op2);
 
 		// test if both operations produce approximately equal results
-		testEqual(testResultFP, expectedResult);
+		testEqual(testResultFP, expectedResult, debug, maxError);
 	}
 }
 
 // tests if a fixed point number is approximately equal to a given number
-let testEqual = function(fp: FixedPoint, n: number, maxError: number = 0.0001) {
+let testEqual = function(fp: FixedPoint, n: number, debug: boolean, maxError: number) {
 	/*
 	let nFp: FixedPoint = FixedPoint.fromNumber(n);
 	console.log((nFp.rawValue == fp.rawValue)? "pass" : "fail");
