@@ -52,3 +52,7 @@ testSub([[a, b], [134,-123], [23423.5446, -3545.345]]);
 // test mul
 let testMul: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.mul, (a, b) => a * b, undefined, 0.001);
 testMul([[a, b], [a, -b], [-1 * a, b], [-23.424, 234], [23.424, 234]]);
+
+// test div
+let testDiv: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.div, (a, b) => a / b, undefined, 0.01);
+testDiv([[1,3], [1,-3], [-1,3], [-1,-3], [a, b], [14.34, 0.23], [0.1232, 0.21], [24.34, -7.62]]);
