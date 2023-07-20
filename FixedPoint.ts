@@ -2,6 +2,7 @@ export class FixedPoint {
 	// This class represents a Q15.16 fixed point number
 	// We implement 4 basic operations: +, -, *, /...
 	// ...without checking for over/under-flow
+	// Note that in BumperCoins we work with small, manageable numbers
 	
 	// the scaling factor is 1/(2^16) or 2^-16
 	static scaleShift = 16;

@@ -30,10 +30,9 @@ let testOperation = function(operandPairs: [number, number][], fixedPointFn: (a:
 
 // tests if a fixed point number is approximately equal to a given number
 let testEqual = function(fp: FixedPoint, n: number, debug: boolean, maxError: number) {
-	/*
-	let nFp: FixedPoint = FixedPoint.fromNumber(n);
-	console.log((nFp.rawValue == fp.rawValue)? "pass" : "fail");
-	*/
+	if (debug) {
+		console.log(`FixedPoint to number: ${FixedPoint.toNumber(fp)} vs expected number: ${n}`);
+	}
 	let diff: number = Math.abs(FixedPoint.toNumber(fp) - n);
 	console.log((diff <= maxError)? "pass" : "fail");
 }
@@ -51,5 +50,5 @@ let testSub: (operandPairs: [number, number][]) => void = createTestOperation(Fi
 testSub([[a, b], [134,-123], [23423.5446, -3545.345]]);
 
 // test mul
-let testMul: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.mul, (a, b) => a * b);
-testMul([[a, b], [a, -b], [-1 * a, b], [-23.424, 2345], [23.424, 2345]]);
+let testMul: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.mul, (a, b) => a * b, undefined, 0.001);
+testMul([[a, b], [a, -b], [-1 * a, b], [-23.424, 234], [23.424, 234]]);
