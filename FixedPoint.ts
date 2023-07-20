@@ -80,6 +80,26 @@ export class FixedPoint {
 		return new FixedPoint(quotient | 0);
 	}
 
+	// input is non-negative
+	static sqrt(a: FixedPoint): FixedPoint {
+		let n: number = a.rawValue | 0;
+		let x: number = n | 0;
+		let c: number = 0 | 0;
+		let d: number = 1 << 30;
+		while ((d|0) > (n|0)) {
+			d >>= 2;
+		}
+		while((d|0) != 0) {
+			if ((x|0) >= (((c|0) + (d|0))|0)) {
+				x = (x - (((c|0) + (d|0))|0)) | 0;
+				c = ((c >> 1) + (d|0)) | 0;
+			} else {
+				c >>= 1;
+			}
+			d >>= 2;
+		}
+		return new FixedPoint(c << (FixedPoint.scaleShift >> 1));
+	}
 
 
 }

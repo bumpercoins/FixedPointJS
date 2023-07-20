@@ -56,3 +56,12 @@ testMul([[a, b], [a, -b], [-1 * a, b], [-23.424, 234], [23.424, 234]]);
 // test div
 let testDiv: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.div, (a, b) => a / b, undefined, 0.01);
 testDiv([[1,3], [1,-3], [-1,3], [-1,-3], [a, b], [14.34, 0.23], [0.1232, 0.21], [24.34, -7.62]]);
+
+let testSqrt = function(operands: number[]) {
+	let operandPairs: [number, number][] = [];
+	for(let o of operands) {
+		operandPairs.push([o, o]);
+	}
+	createTestOperation((a, b) => FixedPoint.sqrt(a), (a, b) => Math.sqrt(a), undefined, 0.01)(operandPairs);
+}
+testSqrt([234.434, 81, 80, 0.0345, 23.624, 2345.8974, 0.00142]);
