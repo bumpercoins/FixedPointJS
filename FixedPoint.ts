@@ -45,6 +45,40 @@ export class FixedPoint {
 		) | 0);
 	}
 
+	static div(a: FixedPoint, b: FixedPoint): FixedPoint {
+		let positiveSign: boolean = true;
+		if (a.rawValue < 0) {
+			a.rawValue *= -1;
+			positiveSign = !positiveSign;
+		}
+		if (b.rawValue < 0) {
+			b.rawValue *= -1;
+			positiveSign = !positiveSign;
+		}
+		let remainder: number = a.rawValue >>> 0;
+		let divisor: number = b.rawValue >>> 0;
+		let leftShift: number = FixedPoint.scaleShift;
+		let quotient: number = 0 >>> 0;
+		while(remainder > 0 && leftShift >=0) {
+			let remainderShift: number = Math.clz32(remainder);
+			remainderShift = Math.min(remainderShift, leftShift);
+			remainder <<= remainderShift;
+			leftShift -= remainderShift
+
+			// crucial to >>> 0 the remainder to treat it is unsigned and not a negative #
+			let res: number = ((remainder >>> 0)/(divisor >>> 0)) >>> 0;
+			remainder = ((remainder >>> 0) % (divisor >>> 0)) >>> 0;
+			quotient += res << leftShift;
+
+			remainder <<= 1;
+			leftShift--;
+		}
+		quotient = quotient | 0;
+		if (!positiveSign) {
+			quotient *= -1;
+		}
+		return new FixedPoint(quotient | 0);
+	}
 
 
 
