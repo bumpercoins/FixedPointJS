@@ -1,0 +1,243 @@
+﻿Fixed Point
+
+
+Idea is that 32 bits to represent a signed number N where the least significant, right most 16 bits are the fractional part and the left 16 are the integer part. So we have this huge number and to get the actual number it represents, we have to divide by 2^16 or visually, introduce a decimal point in the middle: __16__.__16__
+
+
+Javascript stores as doubles so results may not be deterministic but saw on stack overflow and this article (https://james.darpinian.com/blog/integer-math-in-javascript) that by doing (X|0) or (X>>>0) we can “cast” X to a 32 bit signed or unsigned int respectively and basically get the compiler/interpreter/JS engine to understand that we’re working with 32 bit stuff and use that under the hood and get integer math consistent with C.
+
+
+So 32 bits, the 16 LSB are the fractional part and then the other 16 MSB are the integer part. Fixed point 
+
+
+
+
+The purpose of this is to kind of explain to others and myself how this works and what I borrowed from others and justify that despite borrowing, have full understanding of how it all works.
+Referenced source code from libfixmath here: https://github.com/asik/FixedMath.Net/blob/master/src/Fix64.cs and wikipedia https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Digit-by-digit_calculation
+
+
+
+
+Mult
+Want to do A*B where A=A’/2^16 and B=B’/2^16 so M = A*B
+= (A’*B’/2^16)/2^16
+To express above expanded M in fixed point we want M’ such that M = M’/2^16
+So M’ = A’*B’/2^16. So we want to multiply the backing/scaled numbers and then divide by the scaling factor or A’*B’ >> 16.
+Now the issue is that A’*B’ can easily overflow and like imagine if like we overflow by some bits less than 16, then what a waste because if we could “borrow” those bits to add to the left, we could “return” the bits back by truncating by 16 from the right.
+
+
+From libfixmath see a neat trick where we expand out A and B as sums of the integer and fractional part and do the FOIL binomial multiplication expansion (note, we use this in sqrt as well). A = Aint*2^16+Afrac B=Bint*2^16+Bfrac so A*B
+= Aint*Bint*2^16*2^16 + Aint*Bfrac*2^16 + Afrac*Bint*2^16 + AfracBfrac
+And the nice part is we have a whole bunch of 2^16’s littered in (all terms except last AfracBfrac) so this makes it nice for us to do A*B/2^16 which is what we really want
+A*B/2^16 = Aint*Bint*2^16 + AintBfrac + AfracBint + AfracBfrac/2^16
+So this is more overflow resilient. Sure the Aint*Bint*2^16 is a potential overflow but that’s basically saying Aint*Bint fits in 16 bits which for small BumperCoin ops is a given.
+
+
+Div
+Want to do A/B where A=A’/2^16 by B=B’/2^16. Let Q = A/B (Q = quotient)
+Q = A/B = A’/B’. Ok great, the scaling factor cancels out.
+But to then express this in fixed point, we need to introduce the scaling factor again
+That is Q = Q’/2^16 and we want Q` as that’s the backing number we store.
+So Q’ = Q*2^16.
+So to do division we want to divide the backing/scaled numbers and then multiply by the scaling factor.
+
+
+From wiki article, quite uncomfortable dividing the backing numbers and then shifting left by 16 (multiplying). Q’ = Q << 16 = (A/B) << 16
+Problem is the rounding down when computing A/B looses information. So the generally agreed upon technique is to first left shift then divide, that is do Q’ = (A/B) << 16 = (A << 16)/B
+The problem is A is 32 bits and left shifting be 16 again, well we’d need like at least ~32+16=48 bits so there’s the problem of overflow if we want to stay in the confines of 32-bit numbers..
+Again, libfixmath to the rescue
+
+
+Saw “count_leading_zeroes” and “unsigned” and it semi-clicked-predicted the left shift to clear out the leading zeroes (basically rotating/appending them as trailing zeroes) to give us finer “resolution”/max digits to get. Like we don’t want to shift by 16 because that may overflow but instead we shift all the way to the left but no more (and we use unsigned because that gives us an extra digit to work with. Like if we have a positive number it always starts with 0 in 2s complement and we’d have to shift it to countzero-1 to preserve it being positive. If we go all the way left and remove the extra 0 digit then boom, we make the number negative.
+
+
+Instead of binary 16.16 unsigned bdivision, let’s work with decimal 2.2 unsigned division. shifts << and >> will be for base 10, not binary.
+We want to do 1 divided by 3. Or 01.00/03.00. The answer in fixed point should be 00.33 For now let’s only focus on the backing number so dividend = 0100, divisor = 0300 and we want quotient = 0033
+
+
+Ok first let’s be naive and do the wikipedia way. 1/3 integer divide gives us 0 and then we left shift 0 by 2 which still is 0. So this is bad, we loose 2 digits (we got 0000 but want 0033)
+
+
+OK so what most implementations do is left shift the dividend by 2 then do division so that’s
+(0100 << 2)/0300 or 010000/0300 = 0033 but the only problem is that we get an overflow if we stick to 4 digits (we need 5 digits to express 0100 << 2 = 10000) 
+
+
+So the idea then is to shift as much to the left without overflowing. So 0100 can be shifted once to the left to get 1000 and then divide that by 0300 to get 0003. Question now is, how much do we shift this result? Well had we done no shifting, then we have to shift left by 2 as that’s the scaling factor. But since we shifted the numerator to the left once, we have to compensate and shift the result by 1 to the right. So the total shift to do is +2 from the scaling factor and -1 due to the leading 0s shift and we get 2-1 = 1 so we shift 0003 by 1 to the left and get 0030. We desired 0033 as the answer and well 0030 is closer than the previous 0000 so this leading digit approach is promising. But how do we get more digits of the answer? Recall we basically transformed the problem as (0100/0300) shifted left by 2 to (1000/0300) shifted left by 1.
+Integer division to (1000/0300) gave us 0003, but there is the remainder of 0100 that we lost.
+So what we’re missing is this 0100 divided by 0300 and the result shifted left by 1. Well this in turn is a division problem much like the original one 0100 divided by 0300 shifted by 2 except now we shift to the left 1 less so we’ll end up with 0003 not 0030 and added, we get 0033 which is right.
+
+
+But there is a slight issue/edge case where the leading zeroes count is greater than the left shift scaling factor. Lets say we’re doing 4.2 decimal scheme for same problem and we have 000100/000300.  and so we want to left shift by 3 as that’s how many leading zeroes so thats 100000/00300 = 000333 and then well we want to undo this by right shifting by 3 but also left shifting by 2 so the net result is a right shift by 3 - 2. So we get 333 >> 1 or 000033. This right shift by 1 destroys info and it was kind of redundant shifting 000100 by 3 given the scaling using 2 shift so we ended up with an extra digit in the answer that we only deleted so the take away is to just left shift the numerator at most the scaling factor shift. That is 000100 gets shifted only 2 to the left to 010000 and then divide that be 000300 to get 0033 and boom, done, the compensatory shifts cancel out.
+
+
+
+
+So here’s my recursive pseudocode. For now lets assume A.val and B.val are both positive and unsigned scheme
+
+
+divide(Fix A, Fix B) {
+// SHIFT = scaling factor, so 16 for 16.16
+        return new Fix(divideAndShift(A.val, B.val, SHIFT)) 
+}
+Where divideAndShift is a function that basically computes A divided by B and the result shifted left by SHIFT. This is the key function that I believe we can express recursively:
+
+
+divideAndShift(int A, int B, int SHIFT) {
+        If (SHIFT == 0) {
+                // base case: no shift so just do simple integer division
+                return A/B
+        }
+If (A == 0) {
+        // base case
+        return 0
+}
+
+
+        int leadingZeroesA = countLeadingZeroes(A)
+        int aShifted = A << Math.min(leadingZeroesA, SHIFT)
+        int result = (aShifted/B) << (SHIFT - aShifted)
+        // now result is an approximation but we can squeeze more out of it be not letting the remainder go to waste
+        int remainder = aShifted % B
+        return result + divideAndShift(remainder, B, SHIFT - aShifted)
+}
+
+
+The only difference really aside from it being a nice while loop is the 2 lines:
+remainder <<= 1;
+--bitPos;
+Which I think are a good touch to ensure that we’re making progress, namely that bitPos or in my pseudocode SHIFT parameter actually goes down to 0. This also places an upper bound on the total number of loop iterations to ~SHIFT where SHIFT = the scaling factor.
+
+
+Like this makes a lot of sense to me thinking about it just from recursion first principles: we have 2 base cases: when either input A or SHIFT = 0. So in recursive calls, A is the remainder and well, we know from decimal division that sometimes remainder will never hit zero, like our 1/3 example where this is 0.3333…forever getting remainders of 3’s. So the base case definitely need to hit for these non-terminating remainders is when SHIFT = 0 so it’s nice that these 2 lines explicitly shepherd SHIFT to do down toward 0. I thought like aShifted would always be non-negative to SHIFT-aShifted would force progress to be made but yeah, good stuff.
+
+
+Finally, these 2 lines are safe to write in. As we’re dealing with unsigned and the divisor is almost 100% not 1 (because dividing by 1 is kinda stupid-well that could be a base case), then it’s at least 2 so the result definitely has a leading 0, so remainder <<= 1 won’t cause an overflow and bitPos will definitely make progress (and we get an upper bound on max number of loop iterations, like ~scaling factor shift)
+
+
+
+
+So I looked at the code (see below), kinda got it, then implemented my idea as a recursive function and then the code clicked. It is elegant and well way more efficient than extra stack frames so I’ll use it.
+
+
+
+
+
+
+Code (Fix64.cs lines 295-359):
+        static int CountLeadingZeroes(ulong x)
+        {
+            int result = 0;
+            while ((x & 0xF000000000000000) == 0) { result += 4; x <<= 4; }
+            while ((x & 0x8000000000000000) == 0) { result += 1; x <<= 1; }
+            return result;
+        }
+
+
+        public static Fix64 operator /(Fix64 x, Fix64 y)
+        {
+            var xl = x.m_rawValue;
+            var yl = y.m_rawValue;
+
+
+            if (yl == 0)
+            {
+                throw new DivideByZeroException();
+            }
+
+
+            var remainder = (ulong)(xl >= 0 ? xl : -xl);
+            var divider = (ulong)(yl >= 0 ? yl : -yl);
+            var quotient = 0UL;
+            var bitPos = NUM_BITS / 2 + 1;
+
+
+
+
+            // If the divider is divisible by 2^n, take advantage of it.
+            while ((divider & 0xF) == 0 && bitPos >= 4)
+            {
+                divider >>= 4;
+                bitPos -= 4;
+            }
+
+
+            while (remainder != 0 && bitPos >= 0)
+            {
+                int shift = CountLeadingZeroes(remainder);
+                if (shift > bitPos)
+                {
+                    shift = bitPos;
+                }
+                remainder <<= shift;
+                bitPos -= shift;
+
+
+                var div = remainder / divider;
+                remainder = remainder % divider;
+                quotient += div << bitPos;
+
+
+                // Detect overflow
+                if ((div & ~(0xFFFFFFFFFFFFFFFF >> bitPos)) != 0)
+                {
+                    return ((xl ^ yl) & MIN_VALUE) == 0 ? MaxValue : MinValue;
+                }
+
+
+                remainder <<= 1;
+                --bitPos;
+            }
+
+
+            // rounding
+            ++quotient;
+            var result = (long)(quotient >> 1);
+            if (((xl ^ yl) & MIN_VALUE) != 0)
+            {
+                result = -result;
+            }
+
+
+            return new Fix64(result);
+        }
+
+
+
+
+
+
+Sqrt
+Seems newton’s method is the most popular method and perhaps fastest but the idea of having to choose an initial guess bothered me and also the fact that the game’s frontend uses newton’s method then shading in coins with the energy level fill.
+So looked for alternative. And found one on Wikipedia.
+
+
+See fantastic wikipedia article https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Digit-by-digit_calculation
+Let R be 2digit number XY or 10*X + Y. And let Z=R^2. So we want our sqrt(Z) to return R
+Z = R^2
+= (10X+Y)^2
+= 100*X^2 + 10*2XY + Y^2
+The wiki example under “basic principle” does this binomial expansion and then states “X is the largest digit such that X^2 is less than or equal to Z from which we removed the two rightmost digits.”
+And this clicked to me, the heart/spirit of the approach. The key word I’d say is ISOLATION. We’ve expressed Z in terms of sums of weighted powers of 10, and this representation basically is the decimal expansion of the digits of Z. So we’ve ISOLATED X from Y. Wait, but for a large Y, couldn’t the remaining terms (10*2XY+Y^2), esp the cross term “spill-over”/“carry” and affect the hundred’s and optionally thousands (if Z is 4 digit) as we’ve just expressed that is purely dependent on X, namely, X^2.
+See next optional paragraph that traces my mental thoughts digging a bit into this which kinda just repeats this really.
+
+
+Z can be a 3 or 4 digit number (an aside: lower bound 2 digit number,10 10^2 = 100 which is 3 digits and upper bound 2 digit number,99 99^2 = 9801 = 4 digits. An aside in general sqrt like halves the digits and then some, sqrt(10^8) = 10^(8/2) = 10^4 and 10^4 uses five digits, not 4 exemplifying the “then some”)
+Now Z = DCBA or Z = CBA for both cases of Z being 3 or 4 digits, that is Z = DC*100+10*B+A or Z=C*100+10*B+A.
+So the 1’s and 10’s digit part, A+10*B is the same and the point is that the decimal representation of Z has a term that is multiplied by 100 (DC or C). Now one very obvious thing that’s crucial is the simple statement that any representation of a number in any base (binary, decimal, so forth) is UNIQUE. If we can express Z = C*100 + 10*B + A, then the digits C,B, and A the only such digits that can give us Z. That’s how counting/enumeration/number-systems work. There’s only one UNIQUE way to write an integer in decimal form.
+
+
+^before quite wrong, but say the intuition makes sense at least. Worried a bit about cross-terms overflowing
+Much like understanding the bitPos/SHIFT adjustments and thinking in terms of nth “place”/placeholder power in the division, the key to understanding this is also in terms of place. If we have some ai coefficients summed up, the idea is to treat them as the concatenation of a1|a2|...|ai and the place of the concatenation is the place of ai, the LEAST significant coefficient.
+Ex 123000 a1=1, a2=2, a3=3 and a3’s place is the thousands, then a1|a2|a3 is 123 and the place is 1000s so 123*10^3. This notion of a sequential set of coefficients from most significant to least significant and their sum taking on the place being the place of the least significant digit is a key factorization concept that helped me greatly when looking at the nitty gritty index details. Think of everything relative to the whatever the least significant digit/place we’re currently working on.
+
+
+Greedy algo deducing most significant to least significant digit and reusing prev computed digits to get the current one such together they fill in as much space as possible meaning the square of our spprox answer more closely approaches the number being squarerooted and in computing curr digit, we can fill in more space from prior places as well as we always use the unfilled remainder and try to fill it up. So intuitively the algo makes a ton of sense to me.
+
+
+So that’s basically it, after looking at the worked out decimal sqrt example, I felt I basically got it. Ok, now it’s time to look at the binary section. First think to point out is that I was briefly confused with the indexing for “m” being inconsistent with the decimal derivation above.
+Hmmm….well this approach does the exact same thing: We maintain a partial solution that when squared is bounded by the target being square rooted and is the largest such partial solution so yes, greedily filling up the most space. Binary is just very convenient, everything is like multiplication and addition of powers of 2 - especially the “2ab” in (a+b)^2 term has a factor of 2 which is at the heart of this method for all bases, like in all flavors of this algo, we have to double our prev partial sum/root approx (ex. In the decimal case we multiply by 20 which means double and left shift by base 10) and also like the choice of digits just being a 0 and a 1 means we just need a single if statement to check if we overshoot or not. And yeah, the optimizations specified are clearly correct as they’re derived and it makes sense storing not the actual partial sum, but rather how it’s used in the context of finding how much closer we are such that our answer when squared reaches the target and they derive a nifty recurrence. Like even in the decimal case, when you do 20*prev like each time, we see repeat doubling, like look at the example they give and look at the 20*P(artial) terms across the iterations: (20+x)x, (240+x)x, (2460+x)x. Like extending prefixes of 123 get doubled again and again, so it’s not a stretch to consider reusing prev work as this optimization for the binary case does. Anyways, good stuff, great stuff, very excellent Wikipedia article section.
+
+
+
+
+So yeah, that’s the idea behind this approach, so I feel justified using the code directly front the wikipedia article as I understood the derivation 100% and can rederive it, including optimizations.
