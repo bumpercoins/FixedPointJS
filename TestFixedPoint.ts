@@ -64,4 +64,4 @@ let testSqrt = function(operands: number[]) {
 	}
 	createTestOperation((a, b) => FixedPoint.sqrt(a), (a, b) => Math.sqrt(a), undefined, 0.01)(operandPairs);
 }
-testSqrt([234.434, 81, 80, 0.0345, 23.624, 2345.8974, 0.00142]);
+testSqrt([a, b, 234.434, 81, 80, 0.0345, 23.624, 2345.8974, 0.00142]);

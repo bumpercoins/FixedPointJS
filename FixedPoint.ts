@@ -1,6 +1,6 @@
 export class FixedPoint {
 	// This class represents a Q15.16 fixed point number
-	// We implement 4 basic operations: +, -, *, /...
+	// We implement 4 basic arithmetic operations +, -, *, / along with sqrt
 	// ...without checking for over/under-flow
 	// Note that in BumperCoins we work with small, manageable numbers
 	
