@@ -6,6 +6,8 @@ export class FixedPoint {
 	
 	// the scaling factor is 1/(2^16) or 2^-16
 	static scaleShift = 16;
+
+	static zero = new FixedPoint(0|0);
 	
 	// This is the unscaled, backing number that is a signed integer
 	// This number should be able to be precisely represented in 32 bit 2's complement
@@ -22,6 +24,35 @@ export class FixedPoint {
 
 	static toNumber(a: FixedPoint): number {
 		return a.rawValue/(1 << FixedPoint.scaleShift);
+	}
+
+	static lessThan(a: FixedPoint, b: FixedPoint): boolean {
+		return a.rawValue < b.rawValue;
+	}
+
+	static greaterThan(a: FixedPoint, b: FixedPoint): boolean {
+		return a.rawValue > b.rawValue;
+	}
+
+	static lessThanOrEqual(a: FixedPoint, b: FixedPoint): boolean {
+		return a.rawValue <= b.rawValue;
+	}
+
+	static greaterThanOrEqual(a: FixedPoint, b: FixedPoint): boolean {
+		return a.rawValue >= b.rawValue;
+	}
+
+	static abs(a: FixedPoint): FixedPoint {
+		let signMask = a.rawValue >> 31;
+		return new FixedPoint(((a.rawValue|0) + signMask) ^ signMask);
+	}
+
+	static negate(a: FixedPoint): FixedPoint {
+		return new FixedPoint(Math.imul(-1, a.rawValue)|0);
+	}
+
+	static double(a: FixedPoint): FixedPoint {
+		return new FixedPoint(a.rawValue << 1);
 	}
 
 	static add(a: FixedPoint, b: FixedPoint): FixedPoint {
