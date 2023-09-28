@@ -34,7 +34,7 @@ let testEqual = function(fp: FixedPoint, n: number, debug: boolean, maxError: nu
 		console.log(`FixedPoint to number: ${FixedPoint.toNumber(fp)} vs expected number: ${n}`);
 	}
 	let diff: number = Math.abs(FixedPoint.toNumber(fp) - n);
-	console.log((diff <= maxError)? "pass" : "fail");
+	console.log((diff <= maxError)? "pass" : "FAIL");
 }
 
 
@@ -51,7 +51,7 @@ testSub([[a, b], [134,-123], [23423.5446, -3545.345]]);
 
 // test mul
 let testMul: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.mul, (a, b) => a * b, undefined, 0.001);
-testMul([[a, b], [a, -b], [-1 * a, b], [-23.424, 234], [23.424, 234]]);
+testMul([[a, b], [a, -b], [-1 * a, b], [-23.424, 234], [23.424, 234], [-0.0191, -0.0191], [0.0013, 0.0013], [20, 20], [0.999, 0.999], [0.0001, 0.0001], [-0.01908, -0.01908]]);
 
 // test div
 let testDiv: (operandPairs: [number, number][]) => void = createTestOperation(FixedPoint.div, (a, b) => a / b, undefined, 0.01);
@@ -67,4 +67,4 @@ let testSqrt = function(operands: number[]) {
 testSqrt([a, b, 234.434, 81, 80, 0.0345, 23.624, 2345.8974, 0.00142]);
 
 // quick, ad-hoc test for abs
-console.log(FixedPoint.toNumber(FixedPoint.abs(FixedPoint.fromNumber(-5555))) === 5555? "pass" : "fail");
+console.log(FixedPoint.toNumber(FixedPoint.abs(FixedPoint.fromNumber(-5555))) === 5555? "pass" : "FAIL");

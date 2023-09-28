@@ -8,6 +8,7 @@ export class FixedPoint {
 	static scaleShift = 16;
 
 	static zero = new FixedPoint(0|0);
+	static one = new FixedPoint(1 << FixedPoint.scaleShift);
 	
 	// This is the unscaled, backing number that is a signed integer
 	// This number should be able to be precisely represented in 32 bit 2's complement
@@ -24,6 +25,14 @@ export class FixedPoint {
 
 	static toNumber(a: FixedPoint): number {
 		return a.rawValue/(1 << FixedPoint.scaleShift);
+	}
+
+	static clone(a: FixedPoint): FixedPoint {
+		return new FixedPoint(a.rawValue);
+	}
+
+	static equals(a: FixedPoint, b: FixedPoint): boolean {
+		return a.rawValue == b.rawValue;
 	}
 
 	static lessThan(a: FixedPoint, b: FixedPoint): boolean {
@@ -55,6 +64,10 @@ export class FixedPoint {
 		return new FixedPoint(a.rawValue << 1);
 	}
 
+	static halve(a: FixedPoint): FixedPoint {
+		return new FixedPoint(a.rawValue >> 1);
+	}
+
 	static add(a: FixedPoint, b: FixedPoint): FixedPoint {
 		return new FixedPoint(((a.rawValue|0) + (b.rawValue|0))|0);
 	}
@@ -64,30 +77,49 @@ export class FixedPoint {
 	}
 
 	static mul(a: FixedPoint, b: FixedPoint): FixedPoint {
-		let aHi: number = a.rawValue >> FixedPoint.scaleShift;
-		let aLo: number = a.rawValue & 0x0000FFFF;
-		let bHi: number = b.rawValue >> FixedPoint.scaleShift;
-		let bLo: number = b.rawValue & 0x0000FFFF;
-		return new FixedPoint((
-			((Math.imul(aLo, bLo)) >> FixedPoint.scaleShift) +
+		let positiveSign: boolean = true;
+		let aRawValue: number = a.rawValue;
+		let bRawValue: number = b.rawValue;
+		if (aRawValue < 0) {
+			aRawValue *= -1;
+			positiveSign = !positiveSign;
+		}
+		if (bRawValue < 0) {
+			bRawValue *= -1;
+			positiveSign = !positiveSign;
+		}
+		let aHi: number = aRawValue >> FixedPoint.scaleShift;
+		let aLo: number = aRawValue & 0x0000FFFF;
+		let bHi: number = bRawValue >> FixedPoint.scaleShift;
+		let bLo: number = bRawValue & 0x0000FFFF;
+		let sum: number = ((
+			// the hi int don't think will be big, but the lo frac part may be so use unsigned?
+			//((Math.imul(aLo, bLo)) >> FixedPoint.scaleShift) +
+			((Math.imul(aLo, bLo)) >>> FixedPoint.scaleShift) +
 			(Math.imul(aLo, bHi) | 0) +
 			(Math.imul(bLo, aHi) | 0) +
 			((Math.imul(aHi, bHi)) << FixedPoint.scaleShift)
 		) | 0);
+		if (!positiveSign) {
+			sum *= -1;
+		}
+		return new FixedPoint(sum);
 	}
 
 	static div(a: FixedPoint, b: FixedPoint): FixedPoint {
 		let positiveSign: boolean = true;
-		if (a.rawValue < 0) {
-			a.rawValue *= -1;
+		let aRawValue: number = a.rawValue;
+		let bRawValue: number = b.rawValue;
+		if (aRawValue < 0) {
+			aRawValue *= -1;
 			positiveSign = !positiveSign;
 		}
-		if (b.rawValue < 0) {
-			b.rawValue *= -1;
+		if (bRawValue < 0) {
+			bRawValue *= -1;
 			positiveSign = !positiveSign;
 		}
-		let remainder: number = a.rawValue >>> 0;
-		let divisor: number = b.rawValue >>> 0;
+		let remainder: number = aRawValue >>> 0;
+		let divisor: number = bRawValue >>> 0;
 		let leftShift: number = FixedPoint.scaleShift;
 		let quotient: number = 0 >>> 0;
 		while(remainder > 0 && leftShift >=0) {
@@ -131,6 +163,4 @@ export class FixedPoint {
 		}
 		return new FixedPoint(c << (FixedPoint.scaleShift >> 1));
 	}
-
-
 }
